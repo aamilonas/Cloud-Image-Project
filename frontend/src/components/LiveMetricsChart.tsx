@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -13,6 +13,7 @@ import {
   Tooltip as RechartsTooltip,
 } from 'recharts'
 import { useMetricsHistory } from '@/hooks/useMetricsHistory'
+import { useMetrics } from '@/hooks/useMetrics'
 import type { MetricsWindow } from '@/types/api'
 
 const TIME_RANGES: { label: MetricsWindow }[] = [
@@ -27,12 +28,82 @@ interface ScaleEvent {
   label: string
 }
 
+interface LiveTailPoint {
+  time: number
+  queueDepth: number
+  activeWorkers: number
+}
+
+const LIVE_TAIL_BUCKET_MS = 3000
+
+function bucketTimestamp(time: number): number {
+  return Math.floor(time / LIVE_TAIL_BUCKET_MS) * LIVE_TAIL_BUCKET_MS
+}
+
 export function LiveMetricsChart() {
   const [rangeIndex, setRangeIndex] = useState(2) // default 15m
+  const [liveTailPoints, setLiveTailPoints] = useState<LiveTailPoint[]>([])
   const window = TIME_RANGES[rangeIndex].label
   const { data, isLoading } = useMetricsHistory(window)
+  const { data: liveMetrics } = useMetrics()
 
-  const chartData = data?.points ?? []
+  const historyPoints = data?.points ?? []
+  const latestHistoryPointTime = historyPoints.at(-1)?.time ?? 0
+
+  useEffect(() => {
+    setLiveTailPoints((current) =>
+      current.filter((point) => point.time > latestHistoryPointTime)
+    )
+  }, [latestHistoryPointTime])
+
+  useEffect(() => {
+    if (liveMetrics == null) {
+      return
+    }
+
+    const livePointTime = new Date(liveMetrics.timestamp).getTime()
+    if (!Number.isFinite(livePointTime) || livePointTime <= latestHistoryPointTime) {
+      return
+    }
+
+    const nextPoint: LiveTailPoint = {
+      time: livePointTime,
+      queueDepth: liveMetrics.queueDepth,
+      activeWorkers: liveMetrics.activeWorkers,
+    }
+
+    setLiveTailPoints((current) => {
+      const bucket = bucketTimestamp(nextPoint.time)
+      const trimmed = current.filter((point) => point.time > latestHistoryPointTime)
+      const existingIndex = trimmed.findIndex(
+        (point) => bucketTimestamp(point.time) === bucket
+      )
+
+      if (existingIndex >= 0) {
+        const updated = [...trimmed]
+        updated[existingIndex] = nextPoint
+        return updated
+      }
+
+      return [...trimmed, nextPoint].sort((a, b) => a.time - b.time)
+    })
+  }, [latestHistoryPointTime, liveMetrics])
+
+  const chartData = useMemo(() => {
+    const merged = new Map<number, LiveTailPoint>()
+
+    for (const point of historyPoints) {
+      merged.set(point.time, point)
+    }
+
+    for (const point of liveTailPoints) {
+      if (point.time > latestHistoryPointTime) {
+        merged.set(point.time, point)
+      }
+    }
+
+    return Array.from(merged.values()).sort((a, b) => a.time - b.time)
+  }, [historyPoints, latestHistoryPointTime, liveTailPoints])
 
   const scaleEvents = useMemo<ScaleEvent[]>(() => {
     const events: ScaleEvent[] = []
@@ -85,10 +156,10 @@ export function LiveMetricsChart() {
             </div>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={280}>
+          <ResponsiveContainer width="100%" height={320}>
             <ComposedChart
               data={chartData}
-              margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+              margin={{ top: 40, right: 24, left: 8, bottom: 12 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -110,6 +181,15 @@ export function LiveMetricsChart() {
                 axisLine={false}
                 tickLine={false}
                 width={40}
+                label={{
+                  value: 'Queue Depth',
+                  angle: -90,
+                  position: 'insideLeft',
+                  offset: 2,
+                  fill: '#635BFF',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
               />
               <YAxis
                 yAxisId="workers"
@@ -118,7 +198,16 @@ export function LiveMetricsChart() {
                 tick={{ fontSize: 11, fill: '#8792A2' }}
                 axisLine={false}
                 tickLine={false}
-                width={30}
+                width={44}
+                label={{
+                  value: 'Active Workers',
+                  angle: 90,
+                  position: 'insideRight',
+                  offset: 2,
+                  fill: '#00875A',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
               />
               <RechartsTooltip
                 contentStyle={{
@@ -161,6 +250,7 @@ export function LiveMetricsChart() {
                   stroke="#635BFF"
                   strokeDasharray="4 4"
                   strokeOpacity={0.5}
+                  ifOverflow="extendDomain"
                   label={{
                     value: event.label,
                     position: 'top',
