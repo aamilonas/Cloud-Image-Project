@@ -1,4 +1,4 @@
-export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed'
+export type JobStatus = 'pending' | 'queued' | 'processing' | 'completed' | 'failed'
 
 export interface JobVariants {
   thumbnail?: string
@@ -29,20 +29,28 @@ export interface SubmitJobRequest {
 export interface SubmitJobResponse {
   jobId: string
   status: JobStatus
-  createdAt: string
+  createdAt?: string
 }
 
 export interface SystemMetrics {
   queueDepth: number
-  messagesInFlight: number
-  runningWorkers: number
+  dlqDepth: number
+  activeWorkers: number
+  pendingWorkers: number
   desiredWorkers: number
-  jobsCompleted: number
-  jobsFailed: number
-  avgDurationMs: number
   timestamp: string
 }
 
-export interface MetricsDataPoint extends SystemMetrics {
+export type MetricsWindow = '1m' | '5m' | '15m' | '30m'
+
+export interface MetricsHistoryPoint {
   time: number
+  queueDepth: number
+  activeWorkers: number
+}
+
+export interface MetricsHistoryResponse {
+  window: MetricsWindow
+  periodSeconds: number
+  points: MetricsHistoryPoint[]
 }

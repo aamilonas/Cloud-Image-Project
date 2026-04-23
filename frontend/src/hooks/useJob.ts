@@ -7,7 +7,7 @@ export function useJob(jobId: string | null) {
     queryKey: ['job', jobId],
     queryFn: () => getJob(jobId!),
     enabled: !!jobId,
-    refetchInterval: 1000,
+    refetchInterval: 3000,
     refetchIntervalInBackground: true,
     staleTime: 0,
   })

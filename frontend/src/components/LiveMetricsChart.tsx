@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -12,15 +12,15 @@ import {
   ReferenceLine,
   Tooltip as RechartsTooltip,
 } from 'recharts'
-import { useMetrics } from '@/hooks/useMetrics'
-import { useMetricsBuffer } from '@/hooks/useMetricsBuffer'
-import type { MetricsDataPoint } from '@/types/api'
+import { useMetricsHistory } from '@/hooks/useMetricsHistory'
+import type { MetricsWindow } from '@/types/api'
 
-const TIME_RANGES = [
-  { label: '1m', ms: 60_000 },
-  { label: '5m', ms: 5 * 60_000 },
-  { label: '15m', ms: 15 * 60_000 },
-] as const
+const TIME_RANGES: { label: MetricsWindow }[] = [
+  { label: '1m' },
+  { label: '5m' },
+  { label: '15m' },
+  { label: '30m' },
+]
 
 interface ScaleEvent {
   time: number
@@ -28,43 +28,26 @@ interface ScaleEvent {
 }
 
 export function LiveMetricsChart() {
-  const { data: metrics } = useMetrics()
-  const { getDataForRange } = useMetricsBuffer(metrics)
   const [rangeIndex, setRangeIndex] = useState(2) // default 15m
-  const [chartData, setChartData] = useState<MetricsDataPoint[]>([])
-  const scaleEventsRef = useRef<ScaleEvent[]>([])
-  const prevWorkersRef = useRef<number | null>(null)
+  const window = TIME_RANGES[rangeIndex].label
+  const { data, isLoading } = useMetricsHistory(window)
 
-  // Track scale events
-  useEffect(() => {
-    if (!metrics) return
-    if (prevWorkersRef.current !== null && prevWorkersRef.current !== metrics.runningWorkers) {
-      scaleEventsRef.current.push({
-        time: Date.now(),
-        label: `${prevWorkersRef.current} \u2192 ${metrics.runningWorkers}`,
-      })
-      // Keep only last 10 events
-      if (scaleEventsRef.current.length > 10) {
-        scaleEventsRef.current = scaleEventsRef.current.slice(-10)
+  const chartData = data?.points ?? []
+
+  const scaleEvents = useMemo<ScaleEvent[]>(() => {
+    const events: ScaleEvent[] = []
+    for (let i = 1; i < chartData.length; i++) {
+      const prev = chartData[i - 1].activeWorkers
+      const curr = chartData[i].activeWorkers
+      if (prev !== curr) {
+        events.push({
+          time: chartData[i].time,
+          label: `${prev} → ${curr}`,
+        })
       }
     }
-    prevWorkersRef.current = metrics.runningWorkers
-  }, [metrics?.runningWorkers, metrics])
-
-  // Update chart data on interval
-  useEffect(() => {
-    const range = TIME_RANGES[rangeIndex]
-    const update = () => setChartData(getDataForRange(range.ms))
-    update()
-    const interval = setInterval(update, 1000)
-    return () => clearInterval(interval)
-  }, [rangeIndex, getDataForRange])
-
-  const scaleEvents = useMemo(() => {
-    const range = TIME_RANGES[rangeIndex]
-    const cutoff = Date.now() - range.ms
-    return scaleEventsRef.current.filter((e) => e.time >= cutoff)
-  }, [chartData, rangeIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+    return events.slice(-10)
+  }, [chartData])
 
   const hasData = chartData.length > 2
 
@@ -96,7 +79,9 @@ export function LiveMetricsChart() {
           <div className="flex h-[280px] items-center justify-center">
             <div className="text-center">
               <Skeleton className="mx-auto mb-3 h-32 w-full max-w-md" />
-              <p className="text-sm text-[#8792A2]">Collecting data...</p>
+              <p className="text-sm text-[#8792A2]">
+                {isLoading ? 'Loading history...' : 'No data in this window yet.'}
+              </p>
             </div>
           </div>
         ) : (
@@ -146,7 +131,7 @@ export function LiveMetricsChart() {
                 labelFormatter={(value) => new Date(Number(value)).toLocaleTimeString()}
                 formatter={(value, name) => [
                   String(value),
-                  name === 'queueDepth' ? 'Queue Depth' : 'Workers',
+                  name === 'queueDepth' ? 'Queue Depth' : 'Active Workers',
                 ]}
               />
               <Area
@@ -162,7 +147,7 @@ export function LiveMetricsChart() {
               <Line
                 yAxisId="workers"
                 type="stepAfter"
-                dataKey="runningWorkers"
+                dataKey="activeWorkers"
                 stroke="#00875A"
                 strokeWidth={2}
                 dot={false}

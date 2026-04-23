@@ -13,6 +13,7 @@ import {
 import { submitJob } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useJobsSession } from '@/context/jobs-session'
 
 const LOAD_TEST_OPTIONS = [
   { count: 25, label: '25', recommended: false },
@@ -22,6 +23,7 @@ const LOAD_TEST_OPTIONS = [
 
 export function LoadTestPanel() {
   const queryClient = useQueryClient()
+  const { addSessionJob } = useJobsSession()
   const [confirmCount, setConfirmCount] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -64,7 +66,16 @@ export function LoadTestPanel() {
           contentType: 'image/jpeg',
           imageBase64: sampleBase64,
         })
-          .then(() => {
+          .then((response) => {
+            addSessionJob({
+              jobId: response.jobId,
+              status: response.status,
+              filename: `load-test-${i + 1}.jpg`,
+              createdAt: response.createdAt ?? new Date().toISOString(),
+              startedAt: null,
+              completedAt: null,
+              durationMs: null,
+            })
             completed++
             setProgress(completed + failed)
           })
@@ -101,7 +112,7 @@ export function LoadTestPanel() {
         toast.success(`${count} jobs submitted — watch the workers scale up`)
       }
     },
-    [queryClient]
+    [addSessionJob, queryClient]
   )
 
   return (

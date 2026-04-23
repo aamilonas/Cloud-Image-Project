@@ -6,7 +6,7 @@ export function useJobs() {
   return useQuery<Job[]>({
     queryKey: ['jobs'],
     queryFn: listJobs,
-    refetchInterval: 3000,
+    refetchInterval: 5000,
     refetchIntervalInBackground: true,
     staleTime: 0,
   })

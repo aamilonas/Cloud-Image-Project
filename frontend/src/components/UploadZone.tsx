@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { submitJob } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useJobsSession } from '@/context/jobs-session'
 
 interface UploadingFile {
   name: string
@@ -13,6 +14,7 @@ interface UploadingFile {
 
 export function UploadZone() {
   const queryClient = useQueryClient()
+  const { addSessionJob } = useJobsSession()
   const [uploading, setUploading] = useState<UploadingFile[]>([])
 
   const uploadMutation = useMutation({
@@ -24,7 +26,16 @@ export function UploadZone() {
         imageBase64: base64,
       })
     },
-    onSuccess: () => {
+    onSuccess: (response, file) => {
+      addSessionJob({
+        jobId: response.jobId,
+        status: response.status,
+        filename: file.name,
+        createdAt: response.createdAt ?? new Date().toISOString(),
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+      })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
     },
     onError: (_err, file) => {

@@ -2,8 +2,14 @@ import { cn } from '@/lib/utils'
 import type { JobStatus } from '@/types/api'
 
 const statusConfig: Record<JobStatus, { label: string; dotClass: string; bgClass: string; textClass: string }> = {
+  pending: {
+    label: 'Pending',
+    dotClass: 'bg-[#64748B]',
+    bgClass: 'bg-[#F1F5F9]',
+    textClass: 'text-[#64748B]',
+  },
   queued: {
-    label: 'Queued',
+    label: 'Pending',
     dotClass: 'bg-[#64748B]',
     bgClass: 'bg-[#F1F5F9]',
     textClass: 'text-[#64748B]',

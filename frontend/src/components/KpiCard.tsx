@@ -9,6 +9,7 @@ interface KpiCardProps {
   secondaryText?: string
   icon: LucideIcon
   highlight?: boolean
+  danger?: boolean
   className?: string
 }
 
@@ -19,6 +20,7 @@ export function KpiCard({
   secondaryText,
   icon: Icon,
   highlight,
+  danger,
   className,
 }: KpiCardProps) {
   const animatedValue = useCountUp(value)
@@ -28,7 +30,8 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-[#E5E7EB] bg-white p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150',
+        'rounded-xl border bg-white p-6 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-150',
+        danger ? 'border-[#DE350B]' : 'border-[#E5E7EB]',
         highlight && 'animate-highlight',
         className
       )}
@@ -40,7 +43,12 @@ export function KpiCard({
         <Icon className="h-4 w-4 text-[#8792A2]" />
       </div>
       <div className="mt-2">
-        <span className="tabular-nums text-[32px] font-bold leading-none tracking-tight text-[#0A2540]">
+        <span
+          className={cn(
+            'tabular-nums text-[32px] font-bold leading-none tracking-tight',
+            danger ? 'text-[#DE350B]' : 'text-[#0A2540]'
+          )}
+        >
           {displayValue}
         </span>
       </div>

@@ -6,7 +6,7 @@ export function useMetrics() {
   return useQuery<SystemMetrics>({
     queryKey: ['metrics'],
     queryFn: getMetrics,
-    refetchInterval: 2000,
+    refetchInterval: 3000,
     refetchIntervalInBackground: true,
     staleTime: 0,
   })

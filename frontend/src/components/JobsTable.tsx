@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusChip } from './StatusChip'
-import { useJobs } from '@/hooks/useJobs'
 import { formatDuration, formatRelativeTime, truncateMiddle } from '@/lib/format'
 import { Eye } from 'lucide-react'
 import type { JobStatus } from '@/types/api'
@@ -20,6 +19,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useJobsSession } from '@/context/jobs-session'
 
 type Filter = 'all' | JobStatus
 
@@ -28,10 +28,17 @@ interface JobsTableProps {
 }
 
 export function JobsTable({ onViewJob }: JobsTableProps) {
-  const { data: jobs, isLoading } = useJobs()
+  const { jobs } = useJobsSession()
   const [filter, setFilter] = useState<Filter>('all')
 
-  const filtered = jobs?.filter((j) => filter === 'all' || j.status === filter) ?? []
+  const filtered =
+    jobs?.filter((job) => {
+      if (filter === 'all') return true
+      if (filter === 'processing') {
+        return job.status === 'pending' || job.status === 'queued' || job.status === 'processing'
+      }
+      return job.status === filter
+    }) ?? []
   const total = jobs?.length ?? 0
 
   const filters: { label: string; value: Filter }[] = [
@@ -77,7 +84,7 @@ export function JobsTable({ onViewJob }: JobsTableProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && (
+            {jobs.length === 0 && (
               <>
                 {Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
@@ -91,7 +98,7 @@ export function JobsTable({ onViewJob }: JobsTableProps) {
                 ))}
               </>
             )}
-            {!isLoading && filtered.length === 0 && (
+            {jobs.length > 0 && filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="h-32 text-center text-sm text-[#8792A2]">
                   No jobs yet. Upload an image or run a load test to get started.
